@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Dictionary for Students</title>
+    
+    <!-- Import React -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Import Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Import Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Your React Component -->
+    <script type="text/babel">
+        // Import required icons from Lucide
+        const { Search, Globe, GraduationCap, BookOpen } = lucide;
+
+        function App() {
+            const [searchTerm, setSearchTerm] = React.useState('');
+            const [result, setResult] = React.useState(null);
+            const [loading, setLoading] = React.useState(false);
+            const [error, setError] = React.useState(null);
+            const [selectedCountry, setSelectedCountry] = React.useState('');
+            const [selectedGrade, setSelectedGrade] = React.useState('');
+
+            const countries = [
+                'United States', 'United Kingdom', 'Canada', 'Australia',
+                'India', 'Singapore', 'Japan', 'Germany', 'France', 'Brazil'
+            ];
+
+            const getGradeLevels = (country) => {
+                const systems = {
+                    'United States': ['9th Grade', '10th Grade', '11th Grade', '12th Grade'],
+                    'United Kingdom': ['Year 10', 'Year 11', 'Year 12', 'Year 13'],
+                    'India': ['Class 9', 'Class 10', 'Class 11', 'Class 12'],
+                    'default': ['Grade 9', 'Grade 10', 'Grade 11', 'Grade 12']
+                };
+                return systems[country] || systems.default;
+            };
+
+            const handleSearch = async () => {
+                if (!searchTerm.trim()) return;
+                
+                setLoading(true);
+                setError(null);
+                
+                try {
+                    // First, search for the article
+                    const searchUrl = new URL('https://en.wikipedia.org/w/api.php');
+                    searchUrl.searchParams.append('action', 'query');
+                    searchUrl.searchParams.append('list', 'search');
+                    searchUrl.searchParams.append('srsearch', `${searchTerm} medicine medical biology`);
+                    searchUrl.searchParams.append('format', 'json');
+                    searchUrl.searchParams.append('origin', '*');
+
+                    const searchResponse = await fetch(searchUrl.toString());
+                    const searchData = await searchResponse.json();
+
+                    if (!searchData.query?.search?.length) {
+                        throw new Error('No results found');
+                    }
+
+                    // Get the full article content
+                    const pageUrl = new URL('https://en.wikipedia.org/w/api.php');
+                    pageUrl.searchParams.append('action', 'query');
+                    pageUrl.searchParams.append('prop', 'extracts|categories');
+                    pageUrl.searchParams.append('exintro', '1');
+                    pageUrl.searchParams.append('explaintext', '1');
+                    pageUrl.searchParams.append('titles', searchData.query.search[0].title);
+                    pageUrl.searchParams.append('format', 'json');
+                    pageUrl.searchParams.append('origin', '*');
+
+                    const pageResponse = await fetch(pageUrl.toString());
+                    const pageData = await pageResponse.json();
+                    const page = Object.values(pageData.query.pages)[0];
+
+                    const isAdvanced = selectedGrade && 
+                        (selectedGrade.includes('11') || selectedGrade.includes('12') || 
+                         selectedGrade.includes('13'));
+
+                    setResult({
+                        title: page.title,
+                        content: processContent(page.extract || '', isAdvanced)
+                    });
+                } catch (error) {
+                    setError(error.message || 'Failed to fetch information');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const processContent = (content, isAdvanced) => {
+                if (!isAdvanced) {
+                    // Simplify content for lower grades
+                    const simplifications = {
+                        'pathophysiology': 'disease process',
+                        'etiology': 'cause',
+                        'epidemiology': 'spread of disease',
+                        'physiological': 'body-related',
+                        'anatomy': 'body structure'
+                    };
+
+                    let processedContent = content;
+                    Object.entries(simplifications).forEach(([complex, simple]) => {
+                        processedContent = processedContent.replace(
+                            new RegExp(complex, 'gi'), 
+                            simple
+                        );
+                    });
+
+                    // Remove parenthetical expressions
+                    processedContent = processedContent.replace(/\([^)]*\)/g, '');
+                    return processedContent;
+                }
+                return content;
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 py-8">
+                    <div className="max-w-4xl mx-auto px-4">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-blue-600 mb-2">
+                                Medical Dictionary for Students
+                            </h1>
+                            <p className="text-gray-600">
+                                Find easy-to-understand medical explanations tailored to your grade level
+                            </p>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow-lg p-6">
+                            {/* Country and Grade Selection */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div className="relative">
+                                    <select
+                                        value={selectedCountry}
+                                        onChange={(e) => setSelectedCountry(e.target.value)}
+                                        className="w-full p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                                    >
+                                        <option value="">Select your country</option>
+                                        {countries.map(country => (
+                                            <option key={country} value={country}>{country}</option>
+                                        ))}
+                                    </select>
+                                    <Globe className="absolute right-4 top-4 text-gray-400" />
+                                </div>
+
+                                <div className="relative">
+                                    <select
+                                        value={selectedGrade}
+                                        onChange={(e) => setSelectedGrade(e.target.value)}
+                                        className="w-full p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                                        disabled={!selectedCountry}
+                                    >
+                                        <option value="">Select your grade</option>
+                                        {selectedCountry && getGradeLevels(selectedCountry).map(grade => (
+                                            <option key={grade} value={grade}>{grade}</option>
+                                        ))}
+                                    </select>
+                                    <GraduationCap className="absolute right-4 top-4 text-gray-400" />
+                                </div>
+                            </div>
+
+                            {/* Search Bar */}
+                            <div className="relative mb-6">
+                                <input
+                                    type="text"
+                                    placeholder="Search for a medical term..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                                    className="w-full p-4 pr-12 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                    onClick={handleSearch}
+                                    className="absolute right-2 top-2 p-2 text-gray-400 hover:text-blue-500"
+                                >
+                                    <Search />
+                                </button>
+                            </div>
+
+                            {/* Loading State */}
+                            {loading && (
+                                <div className="text-center py-8">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+                                    <p className="mt-4 text-gray-600">Searching for information...</p>
+                                </div>
+                            )}
+
+                            {/* Error State */}
+                            {error && (
+                                <div className="text-center py-8">
+                                    <div className="text-red-500 mb-2">
+                                        <BookOpen size={48} className="mx-auto" />
+                                    </div>
+                                    <p className="text-red-600">{error}</p>
+                                </div>
+                            )}
+
+                            {/* Results */}
+                            {result && !loading && !error && (
+                                <div className="bg-white rounded-lg">
+                                    <h2 className="text-2xl font-bold text-blue-600 mb-4">{result.title}</h2>
+                                    <p className="text-gray-700 leading-relaxed">{result.content}</p>
+                                    
+                                    <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                                        <h3 className="text-lg font-semibold text-blue-600 mb-2">Study Tips</h3>
+                                        <ul className="list-disc list-inside text-gray-700 space-y-2">
+                                            <li>Try to explain this concept in your own words</li>
+                                            <li>Connect it to things you already know about the human body</li>
+                                            <li>Draw a diagram if it helps you understand better</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Initial State */}
+                            {!result && !loading && !error && (
+                                <div className="text-center py-8">
+                                    <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
+                                    <p className="text-gray-600">
+                                        Select your country and grade, then search for a medical term
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
